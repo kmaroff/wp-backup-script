@@ -7,17 +7,17 @@
 
 # Configuration
 wp="/opt/php/7.4/bin/php /var/www/u0000000/data/wp-cli.phar" # Path to WP-CLI
-BACKUP_DIR="./wp-backups" # Backup storage directory
+BACKUP_DIR="../wp-backups" # Backup storage directory
 LOG_FILE="${BACKUP_DIR}/backup.log" # Log file path
 ERROR_LOG="${BACKUP_DIR}/error.log" # Error log path
 MAX_LOG_SIZE=10485760 # Max log size (10 MB)
 ARCHIVE_FORMAT="tar" # Archive format: tar or zip
 KEEP_BACKUPS=1 # Number of latest backups to keep
 EXCLUDES=(
-	"./wp-backups"
-  "./wp-content/cache"
-  "./wp-content/uploads/*-*[0-9]x[0-9]*.*"
-  "./wp-content/uploads/*-scaled.*"
+	"../wp-backups"
+  "../wp-content/cache"
+  "../wp-content/uploads/*-*[0-9]x[0-9]*.*"
+  "../wp-content/uploads/*-scaled.*"
 ) # Define excluded files and folders
 
 # Ensure backup directory exists
