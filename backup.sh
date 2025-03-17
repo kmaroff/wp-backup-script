@@ -1,59 +1,57 @@
 #!/bin/bash
 
 # WordPress Backup Script
-# Description: This script creates a backup of a WordPress site, including the database and files.
-# Author:   Art K
-# Version: 1.3
+# Description: Creates a backup of a WordPress site (database + files).
+# Supports: tar.gz or zip format.
+# Author: Your Name
+# Version: 1.4
 
-# Configuration
-wp="/opt/php/7.4/bin/php /var/www/u0000000/data/wp-cli.phar" # Path to WP-CLI
-BACKUP_DIR="../wp-backups" # Backup storage directory
-LOG_FILE="${BACKUP_DIR}/backup.log" # Log file path
-ERROR_LOG="${BACKUP_DIR}/error.log" # Error log path
-MAX_LOG_SIZE=10485760 # Max log size (10 MB)
-ARCHIVE_FORMAT="tar" # Archive format: tar or zip
-KEEP_BACKUPS=1 # Number of latest backups to keep
-EXCLUDES=(
-	"../wp-backups"
-  "../wp-content/cache"
-  "../wp-content/uploads/*-*[0-9]x[0-9]*.*"
-  "../wp-content/uploads/*-scaled.*"
-) # Define excluded files and folders
+# ====== CONFIGURATION ======
+wp="/opt/php/7.4/bin/php /var/www/u0000000/data/wp-cli.phar"  # Path to WP-CLI
+ARCHIVE_FORMAT="tar"  # Change to "zip" if you prefer ZIP archives
+KEEP_BACKUPS=3  # Number of latest backups to keep
 
-# Ensure backup directory exists
-mkdir -p "$BACKUP_DIR"
+# ====== DETECTING PATHS ======
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$SCRIPT_DIR")"  # WordPress root directory
+BACKUP_DIR="${SCRIPT_DIR}/wp-backups"  # Backup storage directory
+mkdir -p "$BACKUP_DIR"  # Ensure backup directory exists
 
-# Generate unique backup folder name (timestamp-based)
+# Generate unique backup folder name
 TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
 BACKUP_PATH="${BACKUP_DIR}/${TIMESTAMP}"
-
-# Check if the backup folder already exists (to avoid accidental overwriting)
-if [ -d "$BACKUP_PATH" ]; then
-    echo "ERROR: Backup folder ${BACKUP_PATH} already exists! Exiting to prevent overwrite." | tee -a "$LOG_FILE"
-    exit 1
-fi
-
-# Create backup directory
 mkdir -p "$BACKUP_PATH"
 
-# Function for logging
+# ====== EXCLUDED FILES & FOLDERS ======
+EXCLUDES=(
+    "$BACKUP_DIR"
+    "$SCRIPT_DIR"
+    "$ROOT_DIR/wp-content/cache"
+    "$ROOT_DIR/wp-content/uploads/*-*[0-9]x[0-9]*.*"
+    "$ROOT_DIR/wp-content/uploads/*-scaled.*"
+)
+
+# ====== LOGGING FUNCTION ======
+LOG_FILE="${BACKUP_DIR}/backup.log"
+ERROR_LOG="${BACKUP_DIR}/error.log"
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
 }
 
-# Rotate logs if they exceed the maximum size (keep last 1000 lines)
+# ====== ROTATE LOG FILE (KEEP LAST 1000 LINES) ======
+MAX_LOG_SIZE=10485760  # 10 MB
 if [ -f "$LOG_FILE" ] && [ $(stat -c%s "$LOG_FILE") -gt "$MAX_LOG_SIZE" ]; then
     tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
     mv "${LOG_FILE}.tmp" "$LOG_FILE"
 fi
 
-# Check if WP-CLI exists
+# ====== CHECK WP-CLI ======
 if ! command -v $wp &> /dev/null; then
-    log "ERROR: WP-CLI not found! Check wp-cli.phar path."
+    log "ERROR: WP-CLI not found! Check path."
     exit 1
 fi
 
-# Argument handling
+# ====== CHECK ARGUMENTS (BACKUP TYPE) ======
 BACKUP_DB=true
 BACKUP_FILES=true
 
@@ -63,63 +61,61 @@ elif [[ "$1" == "--files" ]]; then
     BACKUP_DB=false
 fi
 
-# Log start of backup
+# ====== START BACKUP ======
 log "Starting WordPress backup..."
 
 # Activate maintenance mode
 log "Activating maintenance mode..."
 if ! $wp maintenance-mode activate >> "$LOG_FILE" 2>&1; then
-    log "ERROR: Failed to activate maintenance mode! Exit code: $?"
+    log "ERROR: Failed to activate maintenance mode!"
     exit 1
 fi
 
-# Remove old backups (keeping last $KEEP_BACKUPS backups)
-log "Removing old backups (keeping last $KEEP_BACKUPS backups)..."
+# Remove old backups (keeping last $KEEP_BACKUPS)
+log "Removing old backups (keeping last $KEEP_BACKUPS)..."
 find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d | sort -r | tail -n +$((KEEP_BACKUPS + 1)) | xargs rm -rf
 
-# Backup the database
+# ====== BACKUP DATABASE ======
 if [ "$BACKUP_DB" = true ]; then
     log "Exporting database..."
     DB_BACKUP="${BACKUP_PATH}/db-${TIMESTAMP}.sql"
     $wp db export "$DB_BACKUP"
-
+    
     if [ $? -eq 0 ]; then
         log "Database backup created successfully: ${DB_BACKUP}"
     else
-        log "ERROR: Database backup failed! Exit code: $?"
+        log "ERROR: Database backup failed!"
         $wp maintenance-mode deactivate
         exit 1
     fi
 fi
 
-# Archive site files
+# ====== BACKUP FILES ======
 if [ "$BACKUP_FILES" = true ]; then
     log "Archiving site files..."
 
     if [ "$ARCHIVE_FORMAT" = "tar" ]; then
         FILE_BACKUP="${BACKUP_PATH}/full-backup-${TIMESTAMP}.tar.gz"
         
-        # Convert exclusions for tar
         TAR_EXCLUDES=()
         for EXCLUDE in "${EXCLUDES[@]}"; do
             TAR_EXCLUDES+=(--exclude="$EXCLUDE")
         done
 
-        tar -czvf "$FILE_BACKUP" "${TAR_EXCLUDES[@]}" . 2>> "$ERROR_LOG"
+        tar -czvf "$FILE_BACKUP" "${TAR_EXCLUDES[@]}" -C "$ROOT_DIR" . 2>> "$ERROR_LOG"
 
     elif [ "$ARCHIVE_FORMAT" = "zip" ]; then
         FILE_BACKUP="${BACKUP_PATH}/full-backup-${TIMESTAMP}.zip"
 
-        # Convert exclusions for zip
         ZIP_EXCLUDES=()
         for EXCLUDE in "${EXCLUDES[@]}"; do
             ZIP_EXCLUDES+=("-x $EXCLUDE")
         done
 
-        zip -r "$FILE_BACKUP" . ${ZIP_EXCLUDES[@]} 2>> "$ERROR_LOG"
+        zip -r "$FILE_BACKUP" "$ROOT_DIR" ${ZIP_EXCLUDES[@]} 2>> "$ERROR_LOG"
 
     else
-        log "ERROR: Unsupported archive format: ${ARCHIVE_FORMAT}. Please use 'tar' or 'zip'."
+        log "ERROR: Unsupported archive format: ${ARCHIVE_FORMAT}. Use 'tar' or 'zip'."
         $wp maintenance-mode deactivate
         exit 1
     fi
@@ -127,15 +123,15 @@ if [ "$BACKUP_FILES" = true ]; then
     if [ $? -eq 0 ]; then
         log "Files archived successfully: ${FILE_BACKUP}"
     else
-        log "ERROR: File archiving failed! Exit code: $?"
+        log "ERROR: File archiving failed!"
         $wp maintenance-mode deactivate
         exit 1
     fi
 fi
 
-# Deactivate maintenance mode
+# ====== DISABLE MAINTENANCE MODE ======
 log "Deactivating maintenance mode..."
 $wp maintenance-mode deactivate
 
-# Log completion of backup
+# ====== BACKUP COMPLETED ======
 log "Backup completed successfully."
