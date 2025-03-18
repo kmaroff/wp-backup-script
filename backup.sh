@@ -7,14 +7,14 @@
 # Version: 1.4
 
 # ====== CONFIGURATION ======
-wp="/opt/php/7.4/bin/php /var/www/u0000000/data/wp-cli.phar"  # Path to WP-CLI
+source "$(dirname "$0")/config.sh"  # Path to WP-CLI
 ARCHIVE_FORMAT="tar"  # Change to "zip" if you prefer ZIP archives
 KEEP_BACKUPS=3  # Number of latest backups to keep
 
 # ====== DETECTING PATHS ======
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"  # WordPress root directory
-BACKUP_DIR="${SCRIPT_DIR}/wp-backups"  # Backup storage directory
+BACKUP_DIR="${ROOT_DIR}/wp-backups"  # Backup storage directory
 mkdir -p "$BACKUP_DIR"  # Ensure backup directory exists
 
 # Generate unique backup folder name
@@ -30,6 +30,11 @@ EXCLUDES=(
     "$ROOT_DIR/wp-content/uploads/*-*[0-9]x[0-9]*.*"
     "$ROOT_DIR/wp-content/uploads/*-scaled.*"
 )
+
+echo "Исключаем из архива:"
+for EXCLUDE in "${EXCLUDES[@]}"; do
+    echo "$EXCLUDE"
+done
 
 # ====== LOGGING FUNCTION ======
 LOG_FILE="${BACKUP_DIR}/backup.log"
