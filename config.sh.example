@@ -2,13 +2,14 @@
 # Copy this file to `config.sh` and edit the values for your project.
 
 # Path to WP-CLI (absolute path if needed)
-wp="wp"
+wp="/opt/php/7.4/bin/php /var/www/u0000000/data/wp-cli.phar"
+#wp="wp"
 
 # Archive format: "tar" or "zip"
 ARCHIVE_FORMAT="tar"
 
 # Number of latest backups to keep
-KEEP_BACKUPS=1
+KEEP_BACKUPS=3
 
 # ====== EXCLUDED FILES & FOLDERS ======
 EXCLUDES=(
