@@ -269,7 +269,70 @@ fi
 # END
 # ======================================================
 
-log "Deactivating maintenance mode..."
-"$WP_PATH" maintenance-mode deactivate
 
-log "Backup completed successfully."
+# ======================================================
+# CLI MENU (NEW)
+# ======================================================
+
+show_menu() {
+    echo ""
+    echo "==============================="
+    echo "  WordPress Backup Tool"
+    echo "==============================="
+    echo "1) Полный бэкап (DB + Files)"
+    echo "2) Только база данных"
+    echo "3) Только файлы"
+    echo "4) Восстановление (заглушка)"
+    echo "5) Обновить скрипт (TODO)"
+    echo "6) Настройки (TODO)"
+    echo "7) Выход"
+    echo "==============================="
+}
+
+run_full_backup() {
+    BACKUP_DB=true
+    BACKUP_FILES=true
+    main_backup
+}
+
+run_db_backup() {
+    BACKUP_DB=true
+    BACKUP_FILES=false
+    main_backup
+}
+
+run_files_backup() {
+    BACKUP_DB=false
+    BACKUP_FILES=true
+    main_backup
+}
+
+case "$1" in
+    --db)
+        validate_environment
+        run_db_backup
+        ;;
+    --files)
+        validate_environment
+        run_files_backup
+        ;;
+    --menu|"")
+        validate_environment
+
+        while true; do
+            show_menu
+            read -rp "Выберите действие: " choice
+
+            case "$choice" in
+                1) run_full_backup ;;
+                2) run_db_backup ;;
+                3) run_files_backup ;;
+                4) echo "Restore: TODO" ;;
+                5) echo "Update: TODO" ;;
+                6) echo "Settings: TODO" ;;
+                7) exit 0 ;;
+                *) echo "❌ Неверный выбор" ;;
+            esac
+        done
+        ;;
+esac
